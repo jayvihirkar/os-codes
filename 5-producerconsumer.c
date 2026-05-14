@@ -1,95 +1,57 @@
-/* Producer-Consumer Problem using Counting Semaphores and Mutex Lock */
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <unistd.h>
 
-#define BUFFER_SIZE 5
+int count = 0;
 
-int buffer[BUFFER_SIZE];
-int in = 0, out = 0;
+sem_t mutex; // Declares a semaphore
 
-// Counting semaphores
-sem_t empty;   // Number of empty slots
-sem_t full;    // Number of filled slots
+void *producer(void *arg) {
 
-// Mutex lock for critical section
-pthread_mutex_t mutex;
+    for(int i=0;i<100000;i++) {
 
-// Producer thread function
-void *producer(void *arg)
-{
-    int item, i;
+        sem_wait(&mutex); // accquires lock, if already locked, thread waits
 
-    for (i = 1; i <= 10; i++)
-    {
-        item = rand() % 100;   // Generate random item
+        count++;
 
-        sem_wait(&empty);          // Decrement empty count
-        pthread_mutex_lock(&mutex); // Enter critical section
-
-        buffer[in] = item;
-        printf("Producer produced %d at position %d\n", item, in);
-        in = (in + 1) % BUFFER_SIZE;
-
-        pthread_mutex_unlock(&mutex); // Exit critical section
-        sem_post(&full);              // Increment full count
-
-        sleep(1);
+        sem_post(&mutex); // releases lock
     }
 
-    pthread_exit(NULL);
+    return NULL;
 }
 
-// Consumer thread function
-void *consumer(void *arg)
-{
-    int item, i;
+void *consumer(void *arg) {
 
-    for (i = 1; i <= 10; i++)
-    {
-        sem_wait(&full);            // Decrement full count
-        pthread_mutex_lock(&mutex); // Enter critical section
+    for(int i=0;i<100000;i++) {
 
-        item = buffer[out];
-        printf("Consumer consumed %d from position %d\n", item, out);
-        out = (out + 1) % BUFFER_SIZE;
+        sem_wait(&mutex); // ~
 
-        pthread_mutex_unlock(&mutex); // Exit critical section
-        sem_post(&empty);             // Increment empty count
+        count--;
 
-        sleep(2);
+        sem_post(&mutex); // ~
     }
 
-    pthread_exit(NULL);
+    return NULL;
 }
 
-// Main function
-int main()
-{
-    pthread_t prod, cons;
+int main() {
 
-    // Initialize counting semaphores
-    sem_init(&empty, 0, BUFFER_SIZE); // All buffer slots are initially empty
-    sem_init(&full, 0, 0);            // No items initially
+    pthread_t t1, t2;
+		
+		// (&semaphore, shared, initial_value)
+    sem_init(&mutex, 0, 1); /* Initilizes semaphore with initial value 1, making it 
+															 a binary semaphore */
 
-    // Initialize mutex lock
-    pthread_mutex_init(&mutex, NULL);
+    pthread_create(&t1, NULL, producer, NULL);
+    pthread_create(&t2, NULL, consumer, NULL);
 
-    // Create producer and consumer threads
-    pthread_create(&prod, NULL, producer, NULL);
-    pthread_create(&cons, NULL, consumer, NULL);
+    pthread_join(t1, NULL);
+    pthread_join(t2, NULL);
 
-    // Wait for threads to finish
-    pthread_join(prod, NULL);
-    pthread_join(cons, NULL);
+    printf("Final count = %d\n", count);
 
-    // Destroy semaphores and mutex
-    sem_destroy(&empty);
-    sem_destroy(&full);
-    pthread_mutex_destroy(&mutex);
+    sem_destroy(&mutex); // Deleted semaphore
 
     return 0;
 }
++
