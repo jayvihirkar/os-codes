@@ -1,4 +1,4 @@
-/* Producer-Consumer Problem using Semaphore and Mutex Lock */
+/* Producer-Consumer Problem using Binary Semaphores and Mutex */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,36 +6,36 @@
 #include <semaphore.h>
 #include <unistd.h>
 
-#define BUFFER_SIZE 5   // Size of buffer
+#define BUFFER_SIZE 5
 
 int buffer[BUFFER_SIZE];
 int in = 0, out = 0;
 
-// Semaphores
-sem_t empty;   // Counts empty slots
-sem_t full;    // Counts filled slots
+/* Binary semaphores (values only 0 or 1) */
+sem_t empty = 1;   // Indicates whether buffer has at least one empty slot
+sem_t full = 0;    // Indicates whether buffer has at least one filled slot
 
-// Mutex lock
+/* Mutex lock */
 pthread_mutex_t mutex;
 
-// Producer Function
+/* Producer Function */
 void *producer(void *arg)
 {
     int item, i;
 
     for (i = 1; i <= 10; i++)
     {
-        item = rand() % 100;   // Generate random item
+        item = rand() % 100;
 
-        sem_wait(&empty);      // Wait if buffer is full
-        pthread_mutex_lock(&mutex);   // Enter critical section
+        sem_wait(&empty);              // Wait if buffer is considered full
+        pthread_mutex_lock(&mutex);    // Enter critical section
 
         buffer[in] = item;
         printf("Producer produced: %d at position %d\n", item, in);
         in = (in + 1) % BUFFER_SIZE;
 
-        pthread_mutex_unlock(&mutex); // Exit critical section
-        sem_post(&full);       // Increase full count
+        pthread_mutex_unlock(&mutex);  // Exit critical section
+        sem_post(&full);               // Signal that data is available
 
         sleep(1);
     }
@@ -43,22 +43,22 @@ void *producer(void *arg)
     pthread_exit(NULL);
 }
 
-// Consumer Function
+/* Consumer Function */
 void *consumer(void *arg)
 {
     int item, i;
 
     for (i = 1; i <= 10; i++)
     {
-        sem_wait(&full);       // Wait if buffer is empty
-        pthread_mutex_lock(&mutex);   // Enter critical section
+        sem_wait(&full);               // Wait until an item is available
+        pthread_mutex_lock(&mutex);    // Enter critical section
 
         item = buffer[out];
         printf("Consumer consumed: %d from position %d\n", item, out);
         out = (out + 1) % BUFFER_SIZE;
 
-        pthread_mutex_unlock(&mutex); // Exit critical section
-        sem_post(&empty);      // Increase empty count
+        pthread_mutex_unlock(&mutex);  // Exit critical section
+        sem_post(&empty);              // Signal that buffer is empty again
 
         sleep(2);
     }
@@ -66,27 +66,27 @@ void *consumer(void *arg)
     pthread_exit(NULL);
 }
 
-// Main Function
+/* Main Function */
 int main()
 {
     pthread_t prod, cons;
 
-    // Initialize semaphores
-    sem_init(&empty, 0, BUFFER_SIZE); // Initially all slots are empty
-    sem_init(&full, 0, 0);            // Initially no filled slots
+    /* Initialize binary semaphores */
+    sem_init(&empty, 0, 1);   // Binary semaphore
+    sem_init(&full, 0, 0);    // Binary semaphore
 
-    // Initialize mutex
+    /* Initialize mutex */
     pthread_mutex_init(&mutex, NULL);
 
-    // Create threads
+    /* Create threads */
     pthread_create(&prod, NULL, producer, NULL);
     pthread_create(&cons, NULL, consumer, NULL);
 
-    // Wait for threads to finish
+    /* Wait for threads to finish */
     pthread_join(prod, NULL);
     pthread_join(cons, NULL);
 
-    // Destroy semaphores and mutex
+    /* Destroy semaphores and mutex */
     sem_destroy(&empty);
     sem_destroy(&full);
     pthread_mutex_destroy(&mutex);
